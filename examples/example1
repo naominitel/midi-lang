@@ -1,0 +1,70 @@
+node rep (in: gate, rate: int, length: int, offset: int) (out: gate) = let
+    -- 1 qnote = 24 midi ticks
+    reset = True -> pre(count) == rate-1;
+    count = if reset then 0 else pre(count) + 1;
+    out = if count == offset then in
+     else if count < offset + length then Tie else Off;
+tel
+
+node every (rate: int, div: int, modulo: int, in: gate) (out: gate) = let
+    reset = True -> pre(count) == rate-1;
+    count = if reset then 0 else pre(count) + 1;
+    events = 0 -> if reset then
+                (if pre(events) + 1 == div then 0 else pre(events) + 1)
+             else pre(events);
+    out = if events == modulo then in else Off;
+tel
+
+node massive () (out: mono) = let
+    QNOTE = 24;
+    reset = True -> pre(count) == QNOTE-1;
+    count = if reset then 0 else pre(count) + 1;
+    events = 0 -> if reset then
+                (if pre(events) + 1 == 4 then 0 else pre(events) + 1)
+             else pre(events);
+    vel = if events == 0 then 127 else
+          if events == 1 then 30 else
+          if events == 2 then 127 else 30;
+    gte = rep(On, QNOTE, QNOTE, 0);
+    out = (G1 => gte, vel);
+tel
+
+node drums () (out: poly) = let
+    HNOTE = 48; QNOTE = 24; ENOTE = 12;
+
+    kick = rep(On, QNOTE, ENOTE, 0);
+    snare = every(QNOTE, 4, 3, rep(On, ENOTE, ENOTE/2, 0));
+    clap = rep(On, HNOTE, ENOTE/2, 1*QNOTE);
+    hh = rep(On, HNOTE, ENOTE/4, 1*QNOTE);
+    ltom = rep(On, ENOTE, ENOTE/4, 0);
+
+    out = {
+        C1 => kick, 127;
+        C#1 => snare, 100;
+        D#1 => hh, 100;
+        F1 => clap, 100;
+        B1 => ltom, 127
+    };
+tel
+
+node acid () (out: mono) = let
+    NOTE = 8;
+    reset = True -> pre(count) == NOTE-1;
+    count = if reset then 0 else pre(count) + 1;
+    events = 0 -> if reset then
+                (if pre(events) == 0 then 1 else 0)
+             else pre(events);
+    gte = rep (On, NOTE, 6, 0);
+    pitch = if events == 0 then A3 else A2;
+    vel = 125;
+
+    out = (pitch => gte, vel);
+tel
+
+node main () () = let
+    out = open_out("IAC Driver Bus 1");
+
+    _ = output_poly(out, 10, drums());
+    x = output_mono(out, 2, massive());
+    y = output_mono(out, 3, acid());
+tel

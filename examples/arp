@@ -1,0 +1,32 @@
+-- Fixed velocity, 8 steps arp
+node arp (in: poly, CLK: int) (out: mono) = let
+    -- poly input to note vec
+    --notes = notes(in);
+
+    if 5 != 0 { -- lol length(notes) != 0 {
+        step = (CLK / 6) mod 6; -- length(notes);
+        change = (CLK mod 6) == 0;
+
+        pitch =
+            if change then in[step].pitch
+            else pre(pitch);
+        gate = if change then ON else TIE; 
+        velo = 100;
+
+        out = (pitch => gate, velo);
+    } else {
+        out = MONO_OFF;
+    }
+tel
+
+node main () (out: mono) = let
+    -- channel 1
+    clk = 0 -> pre(clk) + 1;
+    inp = { 48 => ON, 100 ;
+            48 => ON, 100 ;
+            60 => ON, 100 ;
+            72 => ON, 100 ;
+            72 => ON, 100 ;
+            60 => ON, 100 };
+    out = arp (inp, clk);
+tel

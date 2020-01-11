@@ -1,0 +1,27 @@
+node test () (out: int) = let
+    x = 0;
+    y = x + 1;
+    z = x + 2;
+
+    if z == 0 {                   -- blk 1
+        a = 0;
+        b = 1;   -- local to 1.
+
+        if b == 1 {              -- blk 3
+            c = 2;
+            d = 3; -- local to 3
+        } else {                    -- blk 4
+            c = 4;
+        }
+
+        e = c + 1;   -- valid
+        f = d + 1;   -- error
+
+        d = 4;
+    } else {                         -- blk 2
+        a = 1;
+        c = 2;   -- local to 2
+    }
+
+    out = a;
+tel

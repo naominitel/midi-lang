@@ -1,0 +1,14 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+authors = ["Naomi Nitel <naominitel@gmail.com>"]
+
+[profile.release]
+debug = true
+
+[dependencies]
+log = "*"
+midir = "*"
+clap = "*"
+num-traits = "*"
+num-derive = "*"
