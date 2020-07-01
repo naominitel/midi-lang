@@ -37,7 +37,7 @@ let line_end cm pos =
         then match String.index_from_opt file.contents
                                          file.lines.(i-1) '\n' with
              | Some pos -> pos + 1
-             | None -> String.length file.contents - file.lines.(i-1)
+             | None -> String.length file.contents
         else file.lines.(i)
 
 (* Returns the line containg the given position *)
