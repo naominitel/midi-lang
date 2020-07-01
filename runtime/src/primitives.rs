@@ -3,11 +3,11 @@ use bytecode::Value;
 
 #[derive(Clone, Copy)]
 pub struct PrimHandler {
-    instance: fn() -> Vec<Value>,
-    update: fn(instance: &mut Vec<Value>, args: Vec<Value>) -> Value,
+    pub instance: fn() -> Vec<Value>,
+    pub update: fn(instance: &mut Vec<Value>, args: Vec<Value>) -> Value,
 }
 
-mod open_out {
+pub mod open_out {
     use midir::MidiOutput;
     use bytecode::Value;
     use super::PrimHandler;
@@ -105,14 +105,14 @@ mod output_poly {
                 }
                 Value::Undef
             }
-            &[_, _, _] => panic!("bad types for open_out"),
-            _ => panic!("bad arity for open_out")
+            &[_, _, _] => panic!("bad types for output_mono"),
+            _ => panic!("bad arity for output_mono")
         }
     }
 
     pub static PRIM: PrimHandler = PrimHandler { instance, update };
 }
-mod output_mono {
+pub mod output_mono {
     use midir::MidiOutputConnection;
     use bytecode::Value;
     use bytecode::Gate;
@@ -178,8 +178,8 @@ mod output_mono {
                         Value::Undef
                     }
             }
-            &[_, _, _] => panic!("bad types for open_out"),
-            _ => panic!("bad arity for open_out")
+            &[_, _, _] => panic!("bad types for output_poly"),
+            _ => panic!("bad arity for output_poly")
         }
     }
 

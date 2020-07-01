@@ -1,4 +1,6 @@
 use std::sync::{Arc, Mutex};
+
+use runtime;
 use node;
 
 // the type that contains the code to handle incoming
@@ -7,19 +9,22 @@ use node;
 //
 // stores only a shared pointer to the main node instance
 pub struct MidiHandler {
-    main_instance: Arc<Mutex<node::NodeInstance>>,
+    //main_instance: Arc<Mutex<node::NodeInstance>>,
+
+    // just clock counter for now
+    runtime: Arc<Mutex<runtime::Runtime>>,
 }
 
 const MIDI_COMMAND_CLOCK: u8 = 0xF8;
 
 impl MidiHandler {
-    pub fn new(main_instance: Arc<Mutex<node::NodeInstance>>) -> MidiHandler {
-        MidiHandler { main_instance }
+    pub fn new(rt: Arc<Mutex<runtime::Runtime>>) -> MidiHandler {
+        MidiHandler { runtime: rt }
     }
 
     fn handle_clock(&self) {
-        let mut main_instance = self.main_instance.lock().unwrap();
-        main_instance.update(vec![]);
+        let mut runtime = self.runtime.lock().unwrap();
+        runtime.step();
     }
 
     // entry point: called automatically from the callback closure

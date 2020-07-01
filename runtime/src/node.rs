@@ -309,8 +309,7 @@ impl NodeInstance {
         ret
     }
 
-    fn instanciate(def: &NodeDef, handler: &engine::DefMap,
-                   prim_env: &primitives::Env) -> NodeInstance {
+    fn instanciate(def: &NodeDef, engine: &engine::Engine) -> NodeInstance {
         use self::Op::*;
         let mut equ = Vec::with_capacity(def.equs.len());
         let mut sub_nodes = Vec::new();
@@ -329,13 +328,13 @@ impl NodeInstance {
                 bytecode::Op::UnOp(op, v) => UnOp(*op, *v as usize),
                 bytecode::Op::Call(fun, args) => {
                     let k: &String = &fun.borrow();
-                    if let Some(def) = handler.get(k) {
+                    if let Some(def) = engine.node_defs.get(k) {
                         // recursive instanciation
-                        let node = NodeInstance::instanciate(def, handler, prim_env);
+                        let node = NodeInstance::instanciate(def, engine);
                         sub_nodes.push(node);
                         Call(sub_nodes.len() - 1,
                              args.iter().map(|v| *v as usize).collect::<Vec<_>>().into())
-                    } else if let Some(&prim) = prim_env.get(k.as_str()) {
+                    } else if let Some(&prim) = engine.primitives.get(k.as_str()) {
                         let inst = primitives::instance(prim);
                         prim_inst.push(inst);
                     PrimCall(prim, prim_inst.len() - 1,
@@ -375,8 +374,8 @@ impl NodeInstance {
     }
 
     // TODO: arg will probably need to be changed to String
-    pub fn new(def: &NodeDef, handler: &engine::DefMap,
-               prim_env: &primitives::Env) -> NodeInstance {
-        NodeInstance::instanciate(def, handler, prim_env)
+    // FIXME: what's the use of this function??
+    pub fn new(def: &NodeDef, engine: &engine::Engine) -> NodeInstance {
+        NodeInstance::instanciate(def, engine)
     }
 }

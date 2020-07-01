@@ -6,6 +6,7 @@ extern crate num_traits;
 
 use std::io;
 use std::net::{TcpListener};
+use std::sync::{Arc, Mutex};
 use log::debug;
 
 use midir::{MidiInput, MidiOutput};
@@ -16,6 +17,7 @@ mod handler;
 mod message;
 mod node;
 mod primitives;
+mod runtime;
 
 #[derive(Debug)]
 enum RuntimeError {
@@ -104,20 +106,23 @@ fn main_run() -> Result<()> {
             .map_err(|e| RuntimeError::MidiPortInfoError(e))?;
         debug!("listening for MIDI input on {}", name);
 
+        let program = runtime::load_program();
+        let runtime = Arc::new(Mutex::new(runtime::Runtime::new(program)));
         let mut engine = engine::Engine::new();
-        let handler = handler::MidiHandler::new(engine.main_instance());
+        let handler = handler::MidiHandler::new(runtime.clone());
 
         // handler moved into the callback closure and into the midi thread
         let conn = inp.connect(dev_id, "runtime-port", move |_, data, _| {
             handler.handle_message(data[0], &data[1..])
         }, ()).map_err(|e| RuntimeError::MidiConnectError(e))?;
 
-        debug!("listening on {}:{}", bind_addr, bind_port);
+        println!("listening on {}:{}", bind_addr, bind_port);
         let listener = TcpListener::bind((bind_addr, bind_port)).unwrap();
+
 
         loop {
             let (mut cli, _) = listener.accept().unwrap();
-            debug!("client connected from {}", cli.peer_addr().unwrap());
+            println!("client connected from {}", cli.peer_addr().unwrap());
 
             loop {
                 use message::Message;
@@ -132,13 +137,19 @@ fn main_run() -> Result<()> {
                     }
                 };
 
+                println!("message received");
                 match msg {
                     Message::Update(update_msg) => {
                         let node_def = bytecode::NodeDef::parse(update_msg)
                             .map_err(|e| RuntimeError::IoError(e))?;
 
                         node_def.dump();
-                        engine.update(node_def);
+                        let inst = engine.update_and_inst(node_def);
+                        let mut runtime = runtime.lock().unwrap();
+                        runtime.send_pattern(0, runtime::Pattern {
+                            len: 96,
+                            code: inst
+                        })
                     }
                 }
             }

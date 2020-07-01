@@ -8,7 +8,9 @@ const T_UPDATE: u8 = 0x10;
 #[derive(Copy, Clone)]
 pub struct Header {
     msg_size: u32,
-    msg_type: u8
+    msg_type: u8,
+
+    _pad: [u8 ; 3]
 }
 
 #[repr(packed)]

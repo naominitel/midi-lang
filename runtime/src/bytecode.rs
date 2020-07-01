@@ -33,7 +33,7 @@ pub enum Value {
     Primitive(usize),
 }
 
-type MonoNote = (u32, Gate, u32);
+pub type MonoNote = (u32, Gate, u32);
 
 #[derive(Clone, Copy, Debug)]
 pub enum BinOp {
