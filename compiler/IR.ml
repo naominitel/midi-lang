@@ -61,15 +61,53 @@ let add_i64 buf i64 =
     add_u8 buf ((i64 asr 0x30) land 0xFF) ;
     add_u8 buf ((i64 asr 0x38) land 0xFF)
 
+let add_str buf str =
+    for i = 0 to String.length str - 1 do
+        Buffer.add_char buf str.[i]
+    done ;
+    Buffer.add_char buf (char_of_int 0)
+
 let add_pad buf byte count =
     for i = 1 to count do
         add_u8 buf byte
+    done
+
+let add_align buf align =
+    while not ((Buffer.length buf mod align) == 0) do
+        add_u8 buf 0
     done
 
 let add_reloc relocs buf str =
     let seek = Buffer.length buf in
     add_u32 buf 0x00 ;
     relocs := (seek, str) :: !relocs
+
+let add_cst buf relocs cst = match cst with
+    | Cnum i ->
+        add_u8 buf _CONS ;
+        add_u8 buf _INT ;
+        add_pad buf 0x0 6 ;
+        add_i64 buf i
+    | Cbool b ->
+        add_u8 buf _CONS ;
+        add_u8 buf _BOOL ;
+        add_u8 buf @@ if b then 0x01 else 0x00 ;
+        add_align buf 8
+    | Cstr s ->
+        add_u8 buf _CONS ;
+        add_u8 buf _STR ;
+        add_pad buf 0x0 2 ;
+        add_reloc relocs buf s
+    | Cgate g ->
+        add_u8 buf _CONS ;
+        add_u8 buf _GATE ;
+        add_u8 buf @@
+        begin match g with
+            | Goff -> 0x00
+            | Gon  -> 0x01
+            | Gtie -> 0xFF
+        end ;                   (*  *)
+        add_align buf 8
 
 (* FIXME: completely inefficient.
  * should be pre-computed during toposort *)
@@ -93,11 +131,6 @@ let varnum v def =
             else 1 + search tl
     in
     search equs
-
-let add_align buf align =
-    while not ((Buffer.length buf mod align) == 0) do
-        add_u8 buf 0
-    done
 
 (* FIXME: we should not have to carry def along like that... *)
 let add_simple_op buf opc args def =
@@ -138,31 +171,7 @@ let add_expr relocs buf e def = match e with
             add_pad buf 0x0 3 ;
             add_reloc relocs buf (Ident.show v)
         end else add_simple_op buf _NOP [Evar v] def
-    | Econst (Cnum i) ->
-        add_u8 buf _CONS ;
-        add_u8 buf _INT ;
-        add_pad buf 0x0 6 ;
-        add_i64 buf i
-    | Econst (Cbool b) ->
-        add_u8 buf _CONS ;
-        add_u8 buf _BOOL ;
-        add_u8 buf @@ if b then 0x01 else 0x00 ;
-        add_align buf 8
-    | Econst (Cstr s) ->
-        add_u8 buf _CONS ;
-        add_u8 buf _STR ;
-        add_pad buf 0x0 2 ;
-        add_reloc relocs buf s
-    | Econst (Cgate g) ->
-        add_u8 buf _CONS ;
-        add_u8 buf _GATE ;
-        add_u8 buf @@
-        begin match g with
-            | Goff -> 0x00
-            | Gon  -> 0x01
-            | Gtie -> 0xFF
-        end ;                   (*  *)
-        add_align buf 8 ;
+    | Econst cst -> add_cst buf relocs cst
     | Eindex (e1, e2) -> add_simple_op buf _INDX [e1 ; e2] def
     | Efield (e, f) ->
         add_u8 buf _FLD ;
@@ -206,6 +215,22 @@ let def definition =
     (* 16 bits + 32 bits reserved *)
     add_pad msg 0x00 0x30 ;
 
+    (* node attributes *)
+    List.iter
+        (function { pname ; args } ->
+             add_str msg (Ident.show pname) ;
+             add_u8 msg (List.length args) ;
+             add_align msg 8 ;
+             List.iter
+                 (function arg -> match arg with
+                      | PA_id id -> add_cst msg relocs (Cstr (Ident.show id))
+                      | PA_cst cst ->
+                          add_cst msg relocs cst ;
+                          add_align msg 8)
+                 args ;
+             add_align msg 16)
+        definition.attrs ;
+
     let equ_begin = Buffer.length msg in
 
     List.iter
@@ -229,10 +254,7 @@ let def definition =
     let relocs = List.fold_left
         (fun relocs (seek, str) ->
              let new_seek = Buffer.length msg in
-             for i = 0 to String.length str - 1 do
-                 Buffer.add_char msg str.[i]
-             done ;
-             Buffer.add_char msg (char_of_int 0) ;
+             add_str msg str ;
              add_align msg 16 ;
              (seek, new_seek) :: relocs)
         [] !relocs

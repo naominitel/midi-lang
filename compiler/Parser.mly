@@ -40,6 +40,22 @@ span(X):
     | i = X {{ span = ($startpos, $endpos) ; node = i }}
     ;
 
+(* attribute decorators on an item (definitions etc.)
+ * that look like #[property(...)] *)
+item_attribute:
+    | HASH SQOP property = IDENT
+      OP args = separated_list(COMMA, attr_arg) CL SQCL
+      {{ pname = property ; args = args }}
+    ;
+
+attr_arg:
+    | id = IDENT { PA_id id }
+    | cst = NUM { PA_cst (Cnum cst) }
+    | cst = BOOL { PA_cst (Cbool cst) }
+    | cst = STRING { PA_cst (Cstr cst) }
+    | cst = LGATE { PA_cst (Cgate cst) }
+    ;
+
 lit_poly:
     | BROP notes = separated_list(SEMI, poly_note) BRCL { Epoly notes }
     ;
@@ -112,11 +128,13 @@ args:
     ;
 
 node_def:
-    | NODE name = IDENT
+    | attrs = list(item_attribute)
+      NODE name = IDENT
       OP ins = separated_list(COMMA, args) CL
       OP outs = separated_list(COMMA, args) CL
       EQ LET body = equ_block TEL
-      {{ name = name ;
+      {{ attrs = attrs ;
+         name = name ;
          inputs = ins ; outputs = outs ;
          body = body }}
     ;

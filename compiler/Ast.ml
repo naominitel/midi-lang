@@ -18,6 +18,14 @@ type const =
     | Cstr of string
     | Cgate of gate
 
+type prop_arg =
+    | PA_id of Ident.t
+    | PA_cst of const
+
+type attribute =
+    { pname: Ident.t ;
+      args: prop_arg list }
+
 type expr =
     | Ebinop of expr * binop * expr
     | Eunop  of unop * expr
@@ -64,6 +72,7 @@ type signal = {
 }
 
 type definition = {
+    attrs: attribute list ;
     name: Ident.t ;
     (*clk: Ident.t ;*)
     inputs: signal list ;
