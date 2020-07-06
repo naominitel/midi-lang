@@ -14,6 +14,7 @@ use midir::{MidiInput, MidiOutput};
 mod bytecode;
 mod engine;
 mod handler;
+mod interp;
 mod message;
 mod node;
 mod primitives;

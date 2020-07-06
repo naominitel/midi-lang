@@ -5,6 +5,7 @@ use log::debug;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
+use interp;
 use message;
 
 type Var = u16;
@@ -31,6 +32,7 @@ pub enum Value {
     Mono(MonoNote),
     Poly(Arc<[MonoNote]>),
     Primitive(usize),
+    Closure(interp::Function)
 }
 
 pub type MonoNote = (u32, Gate, u32);
