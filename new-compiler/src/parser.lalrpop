@@ -1,0 +1,99 @@
+use crate::ast::{BinOp, Const, Def, Expr, ExprNode, Ident, Node, Type};
+
+grammar;
+
+List<Sep, T>: Vec<T> = {
+    <v: (<T> Sep)*> <e: T> => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+}
+
+Poly: Vec<(Expr, Expr, Expr)> = {
+    "{" <notes: List<",", PolyNote>> "}" => notes
+}
+
+PolyNote: (Expr, Expr, Expr) = {
+    <pitch: Expr> "=>" <gate: Expr> "," <vel: Expr> => {
+        (pitch, gate, vel)
+    }
+}
+
+Node<T>: Node<T> = { T => { Node { node: Box::new(<>) }}};
+
+pub Expr = Node<ExprNode>;
+pub ExprNode: ExprNode = {
+    "fn" "(" <a: List<",", Bind>> ")" "=>" <e: Expr> => { ExprNode::Lambda(a, e) },
+    "let" <i: Ident> "=" <v: Expr> "in" <e: Expr> => { ExprNode::Let(i, v, e) },
+    ExprLogNode,
+};
+
+ExprLog = Node<ExprLogNode>;
+ExprLogNode: ExprNode = {
+    ExprLog OpLog ExprCmp => { ExprNode::BinOp(<>) },
+    ExprCmpNode,
+}
+
+OpLog: BinOp = { "||" => { BinOp::Or },
+                 "&&" => { BinOp::And }, }
+
+ExprCmp: Expr = { Node<ExprCmpNode> => <> };
+ExprCmpNode: ExprNode = {
+    ExprCmp OpCmp ExprArith => { ExprNode::BinOp(<>) },
+    ExprArithNode,
+}
+
+OpCmp: BinOp = { "==" => { BinOp::Eq },
+                 "!=" => { BinOp::Neq },
+                 "<=" => { BinOp::Le },
+                 ">=" => { BinOp::Ge },
+                 "<"  => { BinOp::Lt },
+                 ">"  => { BinOp::Gt }, }
+
+ExprArith = Node<ExprArithNode>;
+ExprArithNode: ExprNode = {
+    ExprArith OpArith ExprFactor => { ExprNode::BinOp(<>) },
+    ExprFactorNode,
+};
+
+OpArith: BinOp = { "+" => { BinOp::Add },
+                   "-" => { BinOp::Sub }, }
+
+ExprFactor = Node<ExprFactorNode>;
+ExprFactorNode: ExprNode = {
+    ExprFactor OpFactor ExprTerm => { ExprNode::BinOp(<>) },
+    ExprTermNode,
+}
+
+OpFactor: BinOp = { "*" => { BinOp::Mul },
+                    "/" => { BinOp::Div },
+                    "%" => { BinOp::Mod }, }
+
+ExprTerm = Node<ExprTermNode>;
+ExprTermNode: ExprNode = {
+    Ident => { ExprNode::Var(<>) },
+    Const => { ExprNode::Cst(<>) },
+    <e: ExprTerm> "." <f: Ident> => { ExprNode::Field(e, f) },
+    <e: ExprTerm> "[" <i: Expr> "]" => { ExprNode::Index(e, i) },
+    <e: ExprTerm> "(" <a: List<",", Expr>> ")" => { ExprNode::Call(e, a) },
+    "(" <e: ExprNode> ")" => e,
+}
+
+Bind: (Ident, Type) = { <i: Ident> ":" <t: Type> => { (i, t) } }
+
+Const: Const = {
+
+}
+
+Type: Type = {
+    "int" => Type::Int,
+    "str" => Type::Str,
+    "poly" => Type::Poly,
+    "mono" => Type::Mono,
+    "gate" => Type::Gate,
+};
+
+pub Def: Def = { "def" <v: Ident> "=" <e: Expr> => Def { name: v, value: e } }
+
+Ident: String = { r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string(), }
