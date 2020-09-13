@@ -129,7 +129,7 @@ impl<'a> NodeDefParser<'a> {
     pub fn new(equs: &message::UpdateMessage) -> NodeDefParser {
         let locals =
             if equs.header.n_locals == 0 { 0 }
-            else { (((((equs.header.n_locals - 1) << 1) >> 4) + 1) << 4) };
+            else { ((((equs.header.n_locals - 1) << 1) >> 4) + 1) << 4 };
         let equ_size =
             if equs.header.equ_sec_size % 16 != 0 {
                 equs.header.equ_sec_size + 8
