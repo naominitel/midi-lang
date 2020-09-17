@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::sync::Arc;
 use bytecode::{self, Value};
 use primitives;
