@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 
 use runtime;
-use node;
 
 // the type that contains the code to handle incoming
 // MIDI messages. contains the entry point of all code

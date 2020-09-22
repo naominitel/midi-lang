@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 use bytecode::NodeDef;
 use node::NodeInstance;
