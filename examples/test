@@ -1,0 +1,1 @@
+def foo = fn (x: mono): mono => x

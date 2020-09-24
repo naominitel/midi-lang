@@ -1,12 +1,12 @@
-use node::NodeInstance;
 use bytecode;
+use interp::Function;
 use std::sync::Arc;
 
 #[derive(Clone)]
 
 pub struct Pattern {
     pub len: usize,
-    pub code: NodeInstance
+    pub code: Function
 }
 
 struct Table<T>(Vec<T>);
@@ -107,9 +107,10 @@ impl Runtime {
             }
 
             // FIXME: dummy
-            chan.progression.at(chan.counter).code.update(vec![]);
-            let mut outputs = chan.progression.at(chan.counter).code.get_outputs();
-            let mono = outputs.swap_remove(0);
+            let input = Value::Mono((64, bytecode::Gate::Off, 100));
+            let mono = chan.progression.at(chan.counter).code.invoke(vec![input]);
+            //let mut outputs = chan.progression.at(chan.counter).code.get_outputs();
+            // let mono = outputs.swap_remove(0);
 
             (primitives::output_mono::PRIM.update)(
                 &mut self.output_mono,

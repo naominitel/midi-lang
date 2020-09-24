@@ -111,6 +111,7 @@ fn main_run() -> Result<()> {
         let runtime = Arc::new(Mutex::new(runtime::Runtime::new(program)));
         let mut engine = engine::Engine::new();
         let handler = handler::MidiHandler::new(runtime.clone());
+        let toplevel = interp::EvalCtx::new();
 
         // handler moved into the callback closure and into the midi thread
         let conn = inp.connect(dev_id, "runtime-port", move |_, data, _| {
@@ -119,7 +120,6 @@ fn main_run() -> Result<()> {
 
         println!("listening on {}:{}", bind_addr, bind_port);
         let listener = TcpListener::bind((bind_addr, bind_port)).unwrap();
-
 
         loop {
             let (mut cli, _) = listener.accept().unwrap();
@@ -145,11 +145,11 @@ fn main_run() -> Result<()> {
                             .map_err(|e| RuntimeError::IoError(e))?;
 
                         node_def.dump();
-                        let inst = engine.update_and_inst(node_def);
+                        let func = interp::Function::new(toplevel.clone(), node_def);
                         let mut runtime = runtime.lock().unwrap();
                         runtime.send_pattern(0, runtime::Pattern {
                             len: 96,
-                            code: inst
+                            code: func
                         })
                     }
                 }
