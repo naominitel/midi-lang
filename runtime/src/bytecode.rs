@@ -55,8 +55,10 @@ pub enum Op {
     Glob(Arc<String>),
     Const(Value),
     Pre(Var),
+    Get(u16),
+    Set(u16, Var),
 
-    Nop(Var),
+    Nop(Vec<Var>),
 
     If(Var, Var, Var),
 
@@ -64,6 +66,8 @@ pub enum Op {
     UnOp(UnOp, Var),
 
     Call(Arc<String>, Vec<Var>),
+    FunCall(Var, Vec<Var>),
+    Lambda(u8, u16, Var),
 
     Index(Var, Var),
     Field(Var, Arc<String>),
@@ -87,7 +91,10 @@ pub struct NodeDef {
 enum Opcode {
     Nop = 0x00,
     Cons = 0x01,
+    Get = 0x02,
+    Set = 0x03,
     Glob = 0x04,
+    Lambda = 0x05,
     Pre = 0x08,
     Add = 0x10,
     Sub = 0x11,
@@ -245,7 +252,7 @@ impl<'a> NodeDefParser<'a> {
                     Op::Pre(var)
                 }
                 Some(Call) => {
-                    let _ = self.read_u8()?;
+                    let t = self.read_u8()?;
                     let nargs = self.read_u16()?;
                     let f = self.read_u32()?;
                     let mut args = Vec::with_capacity(16);
@@ -259,13 +266,47 @@ impl<'a> NodeDefParser<'a> {
                         let _ = self.read_u8()?;
                         nbytes += 1;
                     }
-                    Op::Call(self.get_const(f)?, args)
+                    if t == 0 {
+                        Op::Call(self.get_const(f)?, args)
+                    } else {
+                        let f = (f & 0xFF) as u16;
+                        Op::FunCall(f, args)
+                    }
                 }
-                Some(Nop) => {
+                Some(Get) => {
                     let _ = self.read_u8()?;
                     let var = self.read_u16()?;
                     self.read_pad(4)?;
-                    Op::Nop(var)
+                    Op::Get(var)
+                }
+                Some(Set) => {
+                    let _ = self.read_u8()?;
+                    let var = self.read_u16()?;
+                    let v = self.read_u16()?;
+                    self.read_pad(2)?;
+                    Op::Set(var, v)
+                }
+                Some(Lambda) => {
+                    let nargs = self.read_u8()?;
+                    let nlocals = self.read_u16()?;
+                    let entry = self.read_u16()?;
+                    self.read_pad(2)?;
+                    Op::Lambda(nargs, nlocals, entry)
+                }
+                Some(Nop) => {
+                    let n = self.read_u8()?;
+                    let mut vars = Vec::with_capacity(n as usize);
+                    let mut nbytes = 0;
+                    for i in 0..n+1 {
+                        let var = self.read_u16()?;
+                        vars.push(var);
+                        nbytes += 2;
+                    }
+                    while nbytes % 8 != 0 {
+                        let _ = self.read_u8()?;
+                        nbytes += 1;
+                    }
+                    Op::Nop(vars)
                 }
                 Some(Glob) => {
                     self.read_pad(3)?;
@@ -444,10 +485,14 @@ impl NodeDef {
                 BinOp(And, v1, v2) => debug!("{} && {}", v1, v2),
                 UnOp(Minus, v) => debug!("- {}", v),
                 UnOp(Not, v) => debug!("! {}", v),
-                Nop(v) => debug!("{}", v),
+                Get(c) => debug!("get({})", c),
+                Set(c, v) => debug!("set!({}, {})", c, v),
+                Nop(v) => debug!("{:?}", v),
                 If(c, t, f) => debug!("if {} then {} else {}", c, t, f),
                 Pre(v) => debug!("pre {}", v),
                 Call(f, args) => debug!("{}({:?})", f, args),
+                FunCall(f, args) => debug!("{}({:?})", f, args),
+                Lambda(o, l, v) => debug!("lambda<{},{}> -> {}", o, l, v),
                 Index(v1, v2) => debug!("{}[{}]", v1, v2),
                 Field(v, field) => debug!("{}.{}", v, field),
                 Op::Poly(_) => debug!("poly"),

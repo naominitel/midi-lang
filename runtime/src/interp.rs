@@ -1,13 +1,14 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use bytecode::{self, Value};
 use primitives;
 
 #[derive(Clone)]
 pub struct Function {
-    code: Arc<[Node]>,
-    entry: usize,
-    nargs: usize,
-    env: Arc<EvalCtx>,
+    code: Vec<bytecode::Op>,
+    entry: u16,
+    nargs: u8,
+    nlocals: u16,
+    env: Arc<Mutex<EvalCtx>>,
 }
 
 impl ::std::fmt::Debug for Function {
@@ -25,43 +26,37 @@ impl PartialEq for Function {
 impl Eq for Function {
 }
 
-enum Node {
-    Nop(usize),
-    Glob(Arc<String>),
-    Const(Value),
-    Var(usize),
-    // nargs, op
-    Closure(usize, usize),
-
-    If(usize, usize, usize),
-    BinOp(bytecode::BinOp, usize, usize),
-    UnOp(bytecode::UnOp, usize),
-
-    Call(usize, Vec<usize>),
-    PrimCall(primitives::Primitive, Vec<usize>),
-
-    Index(usize, usize),
-    Field(usize, Arc<String>),
-
-    Poly(Vec<(usize, usize, usize)>),
-    Mono(usize, usize, usize)
-}
-
 #[derive(Debug)]
-struct EvalCtx {
+pub struct EvalCtx {
     env: Vec<Value>,
-    next: Option<Arc<EvalCtx>>
+    next: Option<Arc<Mutex<EvalCtx>>>
 }
 
 impl EvalCtx {
-    fn env(&self, var: usize) -> Value {
+    pub fn new() -> Arc<Mutex<EvalCtx>> {
+        Arc::new(Mutex::new(EvalCtx { env: vec![], next: None }))
+    }
+
+    fn get(&self, var: usize) -> Value {
         if var < self.env.len() {
             return self.env[var].clone();
         }
         if let Some(next) = &self.next {
-            return next.env(var - self.env.len());
+            return next.lock().unwrap().get(var - self.env.len());
         }
         panic!("bad env index");
+    }
+
+    fn set(&mut self, var: usize, val: Value) {
+        if var < self.env.len() {
+            self.env[var] = val;
+            return;
+        }
+        if let Some(next) = &self.next {
+            next.lock().unwrap().set(var - self.env.len(), val);
+        } else {
+            panic!("bad env index");
+        }
     }
 }
 
@@ -118,18 +113,29 @@ macro_rules! typed_unop (
 );
 
 impl Function {
-    fn eval(&self, op: usize, ctx: &Arc<EvalCtx>) -> Value {
-        use self::Node::*;
-        match self.code[op] {
-            Nop(op) => self.eval(op, ctx),
+    fn eval(&self, op: u16, ctx: &Arc<Mutex<EvalCtx>>) -> Value {
+        use bytecode::Op::*;
+        match self.code[op as usize] {
+            Nop(ref ops) => {
+                let mut ret = Value::Undef;
+                for &op in ops {
+                    ret = self.eval(op, ctx);
+                }
+                ret
+            }
             Glob(ref glob) => panic!("unimplemented: globals"),
             Const(ref v) => v.clone(),
-            Var(v) => ctx.env(v),
-            Closure(nargs, op) => {
+            Get(v) => ctx.lock().unwrap().get(v as usize),
+            Set(v, e) => {
+                ctx.lock().unwrap().set(v as usize, self.eval(e, ctx));
+                Value::Undef
+            }
+            Lambda(nargs, nlocals, op) => {
                 Value::Closure(Function {
                     code: self.code.clone(),
                     entry: op,
                     nargs: nargs,
+                    nlocals: nlocals,
                     env: ctx.clone()
                 })
             }
@@ -171,18 +177,17 @@ impl Function {
                 }
             }
 
-            Call(op, ref args) => match self.eval(op, ctx) {
+            Pre(..) => panic!("pre in functional mode"),
+
+            Call(..) => panic!("unimplemented: global function"),
+
+            FunCall(op, ref args) => match self.eval(op, ctx) {
                 Value::Closure(f) => {
                     let args = args.iter().map(|op| self.eval(*op, ctx)).collect::<Vec<_>>();
                     f.invoke(args)
                 }
                 _ => panic!("invoke: expected a function")
             },
-
-            PrimCall(prim, ref args) => {
-                let args = args.iter().map(|op| self.eval(*op, ctx)).collect::<Vec<_>>();
-                unimplemented!("primitives");
-            }
 
             Index(obj, index) => match self.eval(obj, ctx) {
                 Value::Poly(notes) => match self.eval(index, ctx) {
@@ -215,7 +220,7 @@ impl Function {
                 }).collect::<Arc<[_]>>();
                 Value::Poly(notes)
             }
-             
+
             Mono(p, g, v) => {
                 let pitch = self.eval(p, ctx);
                 let gate = self.eval(g, ctx);
@@ -229,11 +234,29 @@ impl Function {
         }
     }
 
-    fn invoke(&self, args: Vec<Value>) -> Value {
-        let ctx = Arc::new(EvalCtx {
-            env: args, next: Some(self.env.clone())
-        });
+    pub fn invoke(&self, args: Vec<Value>) -> Value {
+        if self.nargs as usize != args.len() {
+            panic!("bad arity: expected {} but found {}", self.nargs, args.len());
+        }
+        let mut env = args;
+        for i in 0 .. self.nlocals {
+            env.push(Value::Undef);
+        }
+        let ctx = Arc::new(Mutex::new(EvalCtx {
+            env: env, next: Some(self.env.clone())
+        }));
 
         self.eval(self.entry, &ctx)
+    }
+
+    pub fn new(toplevel_env: Arc<Mutex<EvalCtx>>, def: bytecode::NodeDef)
+           -> Function {
+        if def.outputs.len() != 1 {
+            panic!("function nodes should have exactly 1 output")
+        }
+        Function {
+            env: toplevel_env, nargs: def.n_inputs, nlocals: def.locals.len() as u16,
+            code: def.equs, entry: def.outputs[0]
+        }
     }
 }

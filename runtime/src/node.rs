@@ -317,15 +317,22 @@ impl NodeInstance {
         for eq in def.equs.iter() {
             // bytecode::Op to -> self::Op
             equ.push(match eq {
-                bytecode::Op::Nop(var) => Nop(*var as usize),
+                bytecode::Op::Nop(var) => {
+                    assert!(var.len() == 1);
+                    Nop(var[0] as usize)
+                }
                 bytecode::Op::Glob(glob) => Glob(glob.clone()),
                 bytecode::Op::Const(val) => Const(val.clone()),
+                bytecode::Op::Get(..) => panic!("get: not supported in synchrone node"),
+                bytecode::Op::Set(..) => panic!("set: not supported in synchrone node"),
                 bytecode::Op::Pre(var) => Pre(*var as usize),
                 bytecode::Op::If(c, t, f) =>
                     If(*c as usize, *t as usize, *f as usize),
                 bytecode::Op::BinOp(op, v1, v2) =>
                     BinOp(*op, *v1 as usize, *v2 as usize),
                 bytecode::Op::UnOp(op, v) => UnOp(*op, *v as usize),
+                bytecode::Op::Lambda(..) => panic!("lambda: not supported in synchrone node"),
+                bytecode::Op::FunCall(..) => panic!("funcall: not supported in synchrone node"),
                 bytecode::Op::Call(fun, args) => {
                     let k: &String = &fun.borrow();
                     if let Some(def) = engine.node_defs.get(k) {

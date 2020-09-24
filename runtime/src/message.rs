@@ -41,8 +41,7 @@ pub enum Message {
 }
 
 impl Message {
-    fn read_update<T: io::Read>(from: &mut T,
-                                header_buf: [u8 ; 0x40]) -> io::Result<Message> {
+    fn read_update<T: io::Read>(from: &mut T, header_buf: [u8 ; 0x40]) -> io::Result<Message> {
         let header = unsafe {
             *(transmute::<_, *const UpdateHeader>(&header_buf))
         };
