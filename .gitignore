@@ -1,4 +1,6 @@
 /compiler/_build
 /compiler/*.native
+/new-compiler/Cargo.lock
+/new-compiler/target
 /runtime/Cargo.lock
 /runtime/target
