@@ -13,3 +13,4 @@ features = [ "lexer" ]
 [dependencies]
 lalrpop-util = "*"
 regex = "*"
+clap = "*"

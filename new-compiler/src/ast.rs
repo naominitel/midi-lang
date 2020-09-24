@@ -1,19 +1,23 @@
 pub type Ident = String;
 
+#[derive(Debug)]
 pub enum BinOp {
     Add, Sub, Mul, Div, Mod,
     Eq, Neq, Lt, Gt, Le, Ge,
     And, Or
 }
 
+#[derive(Debug)]
 pub enum UnOp {
     Minus, Plus
 }
 
+#[derive(Debug)]
 pub enum Gate {
     On, Off, Tie
 }
 
+#[derive(Debug)]
 pub enum Const {
     Num(i64),
     Bool(bool),
@@ -21,21 +25,25 @@ pub enum Const {
     Gate(Gate)
 }
 
+#[derive(Debug)]
 pub enum PropertyArg {
     Id(Ident),
     Cst(Const)
 }
 
+#[derive(Debug)]
 pub struct Attribute {
     pub name: Ident,
     pub args: Vec<PropertyArg>
 }
 
+#[derive(Debug)]
 pub struct Node<T> {
     pub node: Box<T>,
 }
 
 pub type Expr = Node<ExprNode>;
+#[derive(Debug)]
 pub enum ExprNode {
     BinOp(Expr, BinOp, Expr),
     UnOp(UnOp, Expr),
@@ -47,21 +55,24 @@ pub enum ExprNode {
     Field(Expr, Ident),
     Poly(Vec<(Expr, Expr, Expr)>),
     Mono(Expr, Expr, Expr),
-    Lambda(Vec<(Ident, Type)>, Expr),
+    Lambda(Vec<(Ident, Type)>, Type, Expr),
     Let(Ident, Expr, Expr),
 }
 
+#[derive(Debug)]
 pub enum Type {
     Int, Str,
     Poly, Mono,
     Gate,
 }
 
+#[derive(Debug)]
 pub struct Def {
     pub name: Ident,
     pub value: Expr,
 }
 
+#[derive(Debug)]
 pub enum Args {
     Named(Vec<(Ident, Type)>),
     Unnamed(Vec<Type>)
@@ -74,6 +85,8 @@ impl Args {
     }
 }
 
+// XXX: should not necessary once we change IR
+#[derive(Debug)]
 pub struct FnDef {
     pub name: Ident,
     pub body: Expr,

@@ -24,7 +24,9 @@ Node<T>: Node<T> = { T => { Node { node: Box::new(<>) }}};
 
 pub Expr = Node<ExprNode>;
 pub ExprNode: ExprNode = {
-    "fn" "(" <a: List<",", Bind>> ")" "=>" <e: Expr> => { ExprNode::Lambda(a, e) },
+    "fn" "(" <a: List<",", Bind>> ")" ":" <t: Type>  "=>" <e: Expr> => {
+        ExprNode::Lambda(a, t, e)
+    },
     "let" <i: Ident> "=" <v: Expr> "in" <e: Expr> => { ExprNode::Let(i, v, e) },
     ExprLogNode,
 };

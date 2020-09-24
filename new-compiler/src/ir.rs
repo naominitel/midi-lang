@@ -1,6 +1,7 @@
 use crate::ast;
 use std::collections::HashMap;
 use crate::util::BinWrite;
+use crate::util::BinWriteExt;
 
 const UPDATE: u32 = 0x10;
 
@@ -8,7 +9,10 @@ const UPDATE: u32 = 0x10;
 enum OpCode {
     Nop = 0x00,
     Cons = 0x01,
+    Get = 0x02,
+    Set = 0x03,
     Glob = 0x04,
+    Lambda = 0x05,
     Pre = 0x08,
     Add = 0x10,
     Sub = 0x11,
@@ -46,13 +50,19 @@ struct TransCtx<'a> {
     buf: Vec<u8>,
     relocs: Vec<(usize, &'a str)>,
     next_node: u16,
+    next_var: u16,
     env: HashMap<String, u16>
+}
+
+impl BinWriteExt for Vec<u8> {
+    fn len(&self) -> usize {
+        self.len()
+    }
 }
 
 use std::io::Write;
 
 impl<'a> TransCtx<'a> {
-
     fn reloc(&mut self, data: &'a str) {
         let seek = self.buf.len();
         self.buf.write_le::<u32>(0);
@@ -188,7 +198,7 @@ impl<'a> TransCtx<'a> {
             Var(v) => {
                 let this = self.next();
                 let v = *self.env.get(&*v).unwrap();
-                self.buf.write_le(OpCode::Nop);
+                self.buf.write_le(OpCode::Get);
                 self.buf.write_le::<u8>(0);
                 self.buf.write_le::<u16>(v);
                 self.buf.align(8);
@@ -199,32 +209,78 @@ impl<'a> TransCtx<'a> {
                 self.write_cst(cst);
                 this
             }
-            // AST nodes affetcting env: let
-            // closures unsupported for now bc of the runtime
+            // AST nodes affecting env: let
             Let(v, e1, e2) => {
                 let e1 = self.expr(e1);
-                let old = self.env.insert(v.clone(), e1);
-                // TODO: ok for now because expressions don't have
-                // side-effects but should force evaluation of e1 first
-                let this = self.next();
-                let e2 = self.expr(e2);
+                let nvar = self.next_var;
+                self.next_var += 1;
+                let e_set = self.next();
+                self.buf.write_le::<u8>(OpCode::Set as u8);
+                self.buf.pad(3);
+                self.buf.write_le::<u16>(nvar);
+                self.buf.write_le::<u16>(e1);
+                let old = self.env.insert(v.clone(), nvar);
+                let e_let = self.expr(e2);
+                // TODO: we could also restore var nums to reuse
+                // memory spaces from different branches of AST
+                // FIXME: not efficient way of restoring context
                 match old {
                     Some(e) => self.env.insert(v.clone(), e),
                     None => self.env.remove(&*v),
                 };
-                e2
+                let this = self.next();
+                self.buf.write_le::<u8>(OpCode::Nop as u8);
+                self.buf.write_le::<u8>(1);
+                self.buf.write_le::<u16>(e_set);
+                self.buf.write_le::<u16>(e_let);
+                self.buf.align(8);
+                this
             }
-            _ => unimplemented!()
+            Call(ef, e_args) => {
+                let ef = self.expr(ef);
+                let eargs = e_args.iter().map(|e| self.expr(e)).collect::<Vec<_>>();
+                let this = self.next();
+                self.buf.write_le::<u8>(OpCode::Call as u8);
+                self.buf.write_le::<u8>(1);
+                self.buf.write_le::<u16>(eargs.len() as u16);
+                self.buf.write_le::<u16>(ef);
+                self.buf.write_le::<u16>(0);
+                for arg in eargs {
+                    self.buf.write_le::<u16>(arg);
+                }
+                self.buf.align(8);
+                this
+            }
+            Lambda(args, _, e) => {
+                // push context frame
+                let old_env = self.env.clone();
+                let old_var = self.next_var;
+                self.next_var = 0;
+                for (i, (v, _)) in args.iter().enumerate() {
+                    self.env.insert(v.clone(), self.next_var);
+                    self.next_var += 1;
+                }
+                let e = self.expr(e);
+                let this = self.next();
+                self.buf.write_le::<u8>(OpCode::Lambda as u8);
+                self.buf.write_le::<u8>(args.len() as u8);
+                self.buf.write_le::<u16>(self.next_var - args.len() as u16);
+                self.buf.write_le::<u16>(e);
+                self.buf.align(8);
+                self.env = old_env;
+                self.next_var = old_var;
+                this
+            }
         }
     }
 
     fn new(buf: Vec<u8>) -> TransCtx<'a> {
-        TransCtx { buf: buf, relocs: Vec::new(),
+        TransCtx { buf: buf, relocs: Vec::new(), next_var: 0,
                    env: HashMap::new(), next_node: 0 }
     }
 }
 
-fn update(def: ast::FnDef) -> Vec<u8> {
+pub fn update(def: ast::FnDef) -> Vec<u8> {
     let buf = Vec::with_capacity(1024);
     let mut ctx = TransCtx::new(buf);
 
@@ -235,7 +291,8 @@ fn update(def: ast::FnDef) -> Vec<u8> {
 
     ctx.buf.write_le::<u8>(def.inputs.len() as u8);
     ctx.buf.write_le::<u8>(def.outputs.len() as u8);
-    ctx.buf.write_le::<u16>(def.locals.len() as u16);
+    // reloc
+    ctx.buf.write_le::<u16>(0 as u16);
 
     // var number of outputs
     ctx.buf.pad(0x30);
@@ -261,20 +318,29 @@ fn update(def: ast::FnDef) -> Vec<u8> {
         ctx.buf.align(16);
     }
 
+    match def.inputs {
+        ast::Args::Named(ref args) => for (i, (v, _)) in args.iter().enumerate() {
+            ctx.env.insert(v.clone(), i as u16);
+            ctx.next_var += 1;
+        }
+        _ => panic!("function args should be named")
+    }
+
     let instr_begin = ctx.buf.len() as u32;
     let e = ctx.expr(&def.body);
     let instr_size = ctx.buf.len() as u32 - instr_begin;
     ctx.buf.align(16);
 
     // locals var (none for now)
-    for _ in def.locals.iter() {
-        buf.write_le::<u16>(0);
+    ctx.next_var -= def.inputs.len() as u16;
+    for _ in 0 .. ctx.next_var {
+        ctx.buf.write_le::<u16>(0);
     }
 
     ctx.buf.align(16);
     let cst_begin = ctx.buf.len() as u32;
 
-    let TransCtx { buf, relocs, .. } = ctx;
+    let TransCtx { mut buf, relocs, .. } = ctx;
 
     // constant data
     let relocs = relocs.into_iter().map(|(seek, data)| {
@@ -293,10 +359,12 @@ fn update(def: ast::FnDef) -> Vec<u8> {
     unsafe {
         use std::mem::transmute;
         *(transmute::<_, *mut u32>(buf.as_ptr())) = size;
+        // locals: number of context variables
+        *(transmute::<_, *mut u16>(buf[0x0E..].as_ptr())) = ctx.next_var;
         // outputs: we only have one and it is the function expr
         *(transmute::<_, *mut u16>(buf[0x10..].as_ptr())) = e;
         *(transmute::<_, *mut u32>(buf[0x20..].as_ptr())) = instr_size;
-        *(transmute::<_, *mut u32>(buf[0x40..].as_ptr())) = cst_size;
+        *(transmute::<_, *mut u32>(buf[0x24..].as_ptr())) = cst_size;
 
         for (seek, new_seek) in relocs {
             *(transmute::<_, *mut u32>(buf[seek as usize..].as_ptr())) =

@@ -24,6 +24,8 @@ pub trait BinWrite: io::Write {
 }
 
 pub trait BinWriteExt: BinWrite {
+    fn len(&self) -> usize;
+
     fn align(&mut self, align: usize) -> io::Result<()> {
         while self.len() % align != 0 {
             self.write_le(0u8)?;
