@@ -1,4 +1,4 @@
-pub type Ident = String;
+use crate::ident::Ident;
 
 #[derive(Debug)]
 pub enum BinOp {

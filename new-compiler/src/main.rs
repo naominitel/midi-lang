@@ -7,6 +7,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
 mod ast;
+mod ident;
 mod ir;
 mod util;
 
@@ -28,7 +29,9 @@ fn main() {
         return;
     }
 
-    let ast = parser::DefParser::new().parse(&s);
+    let mut int = ident::Interner::new();
+    let ast = parser::DefParser::new().parse(&mut int, &s);
+
     match ast {
         Ok(def) => {
             println!("Input `{:?}`", def);

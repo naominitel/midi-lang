@@ -1,5 +1,6 @@
-use crate::ast;
 use std::collections::HashMap;
+use crate::ast;
+use crate::ident::Ident;
 use crate::util::BinWrite;
 use crate::util::BinWriteExt;
 
@@ -51,7 +52,7 @@ struct TransCtx<'a> {
     relocs: Vec<(usize, &'a str)>,
     next_node: u16,
     next_var: u16,
-    env: HashMap<String, u16>
+    env: HashMap<Ident, u16>
 }
 
 impl BinWriteExt for Vec<u8> {
@@ -158,7 +159,7 @@ impl<'a> TransCtx<'a> {
                 self.buf.write_le::<u16>(e);
                 // TODO: fields should be
                 // compiled to int indices
-                self.reloc(&f);
+                self.reloc(f.name());
                 this
             }
 
@@ -287,7 +288,7 @@ pub fn update(def: ast::FnDef) -> Vec<u8> {
     // reserve space for msg size
     ctx.buf.write_le::<u32>(0);
     ctx.buf.write_le::<u32>(UPDATE);
-    ctx.reloc(&def.name);
+    ctx.reloc(&def.name.name());
 
     ctx.buf.write_le::<u8>(def.inputs.len() as u8);
     ctx.buf.write_le::<u8>(def.outputs.len() as u8);
@@ -299,7 +300,7 @@ pub fn update(def: ast::FnDef) -> Vec<u8> {
 
     // attributes
     for ast::Attribute { name, args } in def.attrs.iter() {
-        ctx.buf.write(name.as_bytes());
+        ctx.buf.write(name.name().as_bytes());
         ctx.buf.write_le(0u8);
         ctx.buf.write_le(args.len() as u8);
         ctx.buf.align(8);

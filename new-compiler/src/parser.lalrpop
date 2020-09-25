@@ -1,7 +1,8 @@
 use std::str::FromStr;
-use crate::ast::{BinOp, Const, Def, Expr, ExprNode, Gate, Ident, Node, Type};
+use crate::ast::{BinOp, Const, Def, Expr, ExprNode, Gate, Node, Type};
+use crate::ident::{self, Ident};
 
-grammar;
+grammar(int: &mut ident::Interner);
 
 List<Sep, T>: Vec<T> = {
     <v: (<T> Sep)*> <e: T> => {
@@ -107,4 +108,4 @@ Type: Type = {
 
 pub Def: Def = { "def" <v: Ident> "=" <e: Expr> => Def { name: v, value: e } }
 
-Ident: String = { r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string(), }
+Ident: Ident = { r"[a-zA-Z][_a-zA-Z0-9]*" => int.get(<>) }
