@@ -95,3 +95,73 @@ pub struct FnDef {
     pub locals: Vec<(Ident, Type)>,
     pub attrs: Vec<Attribute>,
 }
+
+pub trait Visitor {
+    fn visit_def(&mut self, def: &mut Def) {
+        def.value.visit(self);
+    }
+
+    fn visit_binop(&mut self, lhs: &mut Expr, op: &mut BinOp, rhs: &mut Expr) {
+        lhs.visit(self);
+        rhs.visit(self);
+    }
+
+    fn visit_op(&mut self, op: &mut UnOp, expr: &mut Expr) {
+        expr.visit(self);
+    }
+
+    fn visit_if(&mut self, cond: &mut Expr, btrue: &mut Expr, bfalse: &mut Expr) {
+        cond.visit(self);
+        btrue.visit(self);
+        bfalse.visit(self);
+    }
+
+    fn visit_call(&mut self, func: &mut Expr, args: &mut Vec<Expr>) {
+        func.visit(self);
+        args.iter_mut().map(|e| e.visit(self));
+    }
+
+    fn visit_var(&mut self, var: &mut Ident) {}
+    fn visit_const(&mut self, cst: &mut Const) {}
+
+    fn visit_index(&mut self, expr: &mut Expr, index: &mut Expr) {
+        expr.visit(self);
+        index.visit(self);
+    }
+
+    fn visit_field(&mut self, expr: &mut Expr, field: &mut Ident) {
+        expr.visit(self);
+    }
+
+    fn visit_poly(&mut self, notes: &mut Vec<(Expr, Expr, Expr)>) {}
+    fn visit_mono(&mut self, pitch: &mut Expr, gate: &mut Expr, vel: &mut Expr) {}
+
+    fn visit_lambda(&mut self, args: &mut Vec<(Ident, Type)>, ret_ty: &mut Type, expr: &mut Expr) {
+        expr.visit(self);
+    }
+
+    fn visit_let(&mut self, var: &mut Ident, val: &mut Expr, expr: &mut Expr) {
+        val.visit(self);
+        expr.visit(self);
+    }
+}
+
+impl Expr {
+    pub fn visit<V: Visitor + ?Sized>(&mut self, v: &mut V) {
+        use ExprNode::*;
+        match &mut *self.node {
+            BinOp(lhs, op, rhs) => v.visit_binop(lhs, op, rhs),
+            UnOp(op, expr) => v.visit_op(op, expr),
+            If(cond, bt, bf) => v.visit_if(cond, bt, bf),
+            Call(f, args) => v.visit_call(f, args),
+            Var(var) => v.visit_var(var),
+            Cst(cst) => v.visit_const(cst),
+            Index(expr, idx) => v.visit_index(expr, idx),
+            Field(expr, fld) => v.visit_field(expr, fld),
+            Poly(notes) => v.visit_poly(notes),
+            Mono(pitch, gate, vel) => v.visit_mono(pitch, gate, vel),
+            Lambda(args, ret_ty, expr) => v.visit_lambda(args, ret_ty, expr),
+            Let(var, val, expr) => v.visit_let(var, val, expr),
+        }
+    }
+}
