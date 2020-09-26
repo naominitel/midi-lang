@@ -8,6 +8,15 @@ use std::rc::Rc;
 pub struct Ident {
     name: Rc<str>,
     id: usize,
+
+    data: Rc<IdentData>
+}
+
+// data for analysis passes
+// TODO: make generic somehow
+// (some kinda compile-time KV store with traits)
+pub struct IdentData {
+    pub scope: Cell<Option<Ident>>,
 }
 
 impl PartialEq for Ident {
@@ -40,6 +49,10 @@ impl Ident {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn data(&self) -> &IdentData {
+        &self.data
+    }
 }
 
 pub struct Interner {
@@ -69,7 +82,11 @@ impl Interner {
     pub fn create(&mut self, name: &str) -> Ident {
         let u = Ident {
             name: name.to_string().into(),
-            id: self.next_id
+            id: self.next_id,
+
+            data: Rc::new(IdentData{
+                scope: Cell::new(None)
+            })
         };
         self.next_id += 1; u
     }

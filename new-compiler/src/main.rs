@@ -9,10 +9,11 @@ use std::io::{Read, Write};
 mod ast;
 mod ident;
 mod ir;
+mod scope;
 mod util;
 
 fn main() {
-    use ast::{Args, ExprNode};
+    use ast::{Args, ExprNode, Visitor};
     use clap::Arg;
 
     let clap = clap::App::new("myapp")
@@ -33,8 +34,14 @@ fn main() {
     let ast = parser::DefParser::new().parse(&mut int, &s);
 
     match ast {
-        Ok(def) => {
-            println!("Input `{:?}`", def);
+        Ok(mut def) => {
+            println!("Parsed: `{:?}`", def);
+
+            let mut scope = scope::Scope::new(&mut int);
+            scope.visit_def(&mut def);
+
+            println!("Scoped: `{:?}`", def);
+
             let (args, ret, body) = match *def.value.node {
                 ExprNode::Lambda(args, ret, body) => (args, ret, body),
                 _ => panic!("toplevel def should be a function")
