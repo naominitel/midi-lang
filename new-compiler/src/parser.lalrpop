@@ -22,71 +22,71 @@ MonoNote: (Expr, Expr, Expr) = {
     }
 }
 
-Node<T>: Node<T> = { T => { Node { node: Box::new(<>) }}};
+Node<T>: Node<T> = { T => Node { node: Box::new(<>) }};
 
 pub Expr = Node<ExprNode>;
 pub ExprNode: ExprNode = {
     "fn" "(" <a: List<",", Bind>> ")" ":" <t: Type>  "=>" <e: Expr> => {
         ExprNode::Lambda(a, t, e)
     },
-    "let" <i: Ident> "=" <v: Expr> "in" <e: Expr> => { ExprNode::Let(i, v, e) },
+    "let" <i: Ident> "=" <v: Expr> "in" <e: Expr> => ExprNode::Let(i, v, e),
     ExprLogNode,
 };
 
 ExprLog = Node<ExprLogNode>;
 ExprLogNode: ExprNode = {
-    ExprLog OpLog ExprCmp => { ExprNode::BinOp(<>) },
+    ExprLog OpLog ExprCmp => ExprNode::BinOp(<>),
     ExprCmpNode,
 }
 
-OpLog: BinOp = { "||" => { BinOp::Or },
-                 "&&" => { BinOp::And }, }
+OpLog: BinOp = { "||" => BinOp::Or,
+                 "&&" => BinOp::And, }
 
 ExprCmp: Expr = { Node<ExprCmpNode> => <> };
 ExprCmpNode: ExprNode = {
-    ExprCmp OpCmp ExprArith => { ExprNode::BinOp(<>) },
+    ExprCmp OpCmp ExprArith => ExprNode::BinOp(<>),
     ExprArithNode,
 }
 
-OpCmp: BinOp = { "==" => { BinOp::Eq },
-                 "!=" => { BinOp::Neq },
-                 "<=" => { BinOp::Le },
-                 ">=" => { BinOp::Ge },
-                 "<"  => { BinOp::Lt },
-                 ">"  => { BinOp::Gt }, }
+OpCmp: BinOp = { "==" => BinOp::Eq,
+                 "!=" => BinOp::Neq,
+                 "<=" => BinOp::Le,
+                 ">=" => BinOp::Ge,
+                 "<"  => BinOp::Lt,
+                 ">"  => BinOp::Gt, }
 
 ExprArith = Node<ExprArithNode>;
 ExprArithNode: ExprNode = {
-    ExprArith OpArith ExprFactor => { ExprNode::BinOp(<>) },
+    ExprArith OpArith ExprFactor => ExprNode::BinOp(<>),
     ExprFactorNode,
 };
 
-OpArith: BinOp = { "+" => { BinOp::Add },
-                   "-" => { BinOp::Sub }, }
+OpArith: BinOp = { "+" => BinOp::Add,
+                   "-" => BinOp::Sub, }
 
 ExprFactor = Node<ExprFactorNode>;
 ExprFactorNode: ExprNode = {
-    ExprFactor OpFactor ExprTerm => { ExprNode::BinOp(<>) },
+    ExprFactor OpFactor ExprTerm => ExprNode::BinOp(<>),
     ExprTermNode,
 }
 
-OpFactor: BinOp = { "*" => { BinOp::Mul },
-                    "/" => { BinOp::Div },
-                    "%" => { BinOp::Mod }, }
+OpFactor: BinOp = { "*" => BinOp::Mul,
+                    "/" => BinOp::Div,
+                    "%" => BinOp::Mod, }
 
 ExprTerm = Node<ExprTermNode>;
 ExprTermNode: ExprNode = {
-    Ident => { ExprNode::Var(<>) },
-    Const => { ExprNode::Cst(<>) },
-    <e: ExprTerm> "." <f: Ident> => { ExprNode::Field(e, f) },
-    <e: ExprTerm> "[" <i: Expr> "]" => { ExprNode::Index(e, i) },
-    <e: ExprTerm> "(" <a: List<",", Expr>> ")" => { ExprNode::Call(e, a) },
+    Ident => ExprNode::Var(<>),
+    Const => ExprNode::Cst(<>),
+    <e: ExprTerm> "." <f: Ident> => ExprNode::Field(e, f),
+    <e: ExprTerm> "[" <i: Expr> "]" => ExprNode::Index(e, i),
+    <e: ExprTerm> "(" <a: List<",", Expr>> ")" => ExprNode::Call(e, a),
     "(" <e: ExprNode> ")" => e,
-    "(" <n: MonoNote> ")" => { let (p, g, v) = n; ExprNode::Mono(p, g, v) },
-    "{" <n: PolyNote> "}" => { ExprNode::Poly(n) }
+    "(" <n: MonoNote> ")" => ExprNode::Mono(n.0, n.1, n.2),
+    "{" <n: PolyNote> "}" => ExprNode::Poly(n)
 }
 
-Bind: (Ident, Type) = { <i: Ident> ":" <t: Type> => { (i, t) } }
+Bind: (Ident, Type) = { <i: Ident> ":" <t: Type> => (i, t) }
 
 Const: Const = {
     r"[0-9]+" => Const::Num(i64::from_str(<>).unwrap()),

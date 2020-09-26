@@ -1,7 +1,8 @@
 extern crate clap;
 extern crate env_logger;
-#[macro_use] extern crate lalrpop_util;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate lalrpop_util;
+extern crate log;
 
 lalrpop_mod!(pub parser);
 

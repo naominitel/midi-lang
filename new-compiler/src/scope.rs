@@ -1,8 +1,7 @@
 // scope analysis
 // replace source identifiers by unique ones which refer to lexical scopes
 
-use std::borrow::Borrow;
-use crate::ast::{Def, Expr, Type, Visitor};
+use crate::ast::{Expr, Type, Visitor};
 use crate::ident::{Ident, Interner};
 
 pub struct Scope<'a> {

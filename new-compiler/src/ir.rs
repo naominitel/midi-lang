@@ -12,9 +12,9 @@ enum OpCode {
     Cons = 0x01,
     Get = 0x02,
     Set = 0x03,
-    Glob = 0x04,
+    // Glob = 0x04,
     Lambda = 0x05,
-    Pre = 0x08,
+    // Pre = 0x08,
     Add = 0x10,
     Sub = 0x11,
     Mul = 0x12,
@@ -29,8 +29,8 @@ enum OpCode {
     Lt = 0x1D,
     And = 0x20,
     Or = 0x21,
-    Not = 0x27,
-    Fby = 0x28,
+    // Not = 0x27,
+    // Fby = 0x28,
     If = 0x40,
     Call = 0x50,
     Indx = 0x54,
@@ -63,6 +63,7 @@ impl BinWriteExt for Vec<u8> {
 
 use std::io::Write;
 
+#[allow(unused_must_use)]
 impl<'a> TransCtx<'a> {
     fn reloc(&mut self, data: &'a str) {
         let seek = self.buf.len();
@@ -92,9 +93,9 @@ impl<'a> TransCtx<'a> {
             ast::Const::Gate(g) => {
                 self.buf.write_le::<u8>(TypeCode::Gate as u8);
                 self.buf.write_le::<u8>(match g {
-                    Off => 0x00,
-                    On  => 0x01,
-                    Tie => 0x02,
+                    ast::Gate::Off => 0x00,
+                    ast::Gate::On  => 0x01,
+                    ast::Gate::Tie => 0x02,
                 });
                 // FIXME: could be pad 5?
                 self.buf.align(8);
@@ -123,6 +124,7 @@ impl<'a> TransCtx<'a> {
     fn expr(&mut self, e: &'a ast::Expr) -> u16 {
         use ast::ExprNode::*;
         use ast::BinOp::*;
+        use ast::UnOp::*;
         match &*e.node {
             // simple operations (AST basic nodes)
             // binops
@@ -143,7 +145,6 @@ impl<'a> TransCtx<'a> {
             // unary ops
             UnOp(Plus, x)    => self.simple_op(OpCode::Nop, &[x]),
             UnOp(Minus, x)   => self.simple_op(OpCode::Min, &[x]),
-            UnOp(Not, x)     => self.simple_op(OpCode::Not, &[x]),
 
             // basic constructs
             If(c, t, f)      => self.simple_op(OpCode::If,  &[c, t, f]),
@@ -257,7 +258,7 @@ impl<'a> TransCtx<'a> {
                 let old_env = self.env.clone();
                 let old_var = self.next_var;
                 self.next_var = 0;
-                for (i, (v, _)) in args.iter().enumerate() {
+                for (v, _) in args {
                     self.env.insert(v.clone(), self.next_var);
                     self.next_var += 1;
                 }
@@ -281,6 +282,7 @@ impl<'a> TransCtx<'a> {
     }
 }
 
+#[allow(unused_must_use)]
 pub fn update(def: ast::FnDef) -> Vec<u8> {
     let buf = Vec::with_capacity(1024);
     let mut ctx = TransCtx::new(buf);

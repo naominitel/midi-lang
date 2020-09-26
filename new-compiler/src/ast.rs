@@ -26,12 +26,14 @@ pub enum Const {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum PropertyArg {
     Id(Ident),
     Cst(Const)
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Attribute {
     pub name: Ident,
     pub args: Vec<PropertyArg>
@@ -96,6 +98,7 @@ pub struct FnDef {
     pub attrs: Vec<Attribute>,
 }
 
+#[allow(path_statements)]
 pub trait Visitor {
     fn visit_def(&mut self, def: &mut Def) {
         def.value.visit(self);
@@ -103,10 +106,12 @@ pub trait Visitor {
 
     fn visit_binop(&mut self, lhs: &mut Expr, op: &mut BinOp, rhs: &mut Expr) {
         lhs.visit(self);
+        op;
         rhs.visit(self);
     }
 
     fn visit_op(&mut self, op: &mut UnOp, expr: &mut Expr) {
+        op;
         expr.visit(self);
     }
 
@@ -118,11 +123,13 @@ pub trait Visitor {
 
     fn visit_call(&mut self, func: &mut Expr, args: &mut Vec<Expr>) {
         func.visit(self);
-        args.iter_mut().map(|e| e.visit(self));
+        for arg in args.iter_mut() {
+            arg.visit(self);
+        }
     }
 
-    fn visit_var(&mut self, var: &mut Ident) {}
-    fn visit_const(&mut self, cst: &mut Const) {}
+    fn visit_var(&mut self, var: &mut Ident) { var; }
+    fn visit_const(&mut self, cst: &mut Const) { cst; }
 
     fn visit_index(&mut self, expr: &mut Expr, index: &mut Expr) {
         expr.visit(self);
@@ -131,25 +138,29 @@ pub trait Visitor {
 
     fn visit_field(&mut self, expr: &mut Expr, field: &mut Ident) {
         expr.visit(self);
+        field;
     }
 
-    fn visit_poly(&mut self, notes: &mut Vec<(Expr, Expr, Expr)>) {}
-    fn visit_mono(&mut self, pitch: &mut Expr, gate: &mut Expr, vel: &mut Expr) {}
+    fn visit_poly(&mut self, notes: &mut Vec<(Expr, Expr, Expr)>) { notes; }
+    fn visit_mono(&mut self, pitch: &mut Expr,
+                  gate: &mut Expr, vel: &mut Expr) { pitch; gate; vel; }
 
-    fn visit_lambda(&mut self, args: &mut Vec<(Ident, Type)>, ret_ty: &mut Type, expr: &mut Expr) {
+    fn visit_lambda(&mut self, args: &mut Vec<(Ident, Type)>,
+                    ret_ty: &mut Type, expr: &mut Expr) {
         expr.visit(self);
+        args; ret_ty;
     }
 
     fn visit_let(&mut self, var: &mut Ident, val: &mut Expr, expr: &mut Expr) {
         val.visit(self);
         expr.visit(self);
+        var;
     }
 }
 
 impl Expr {
     pub fn visit<V: Visitor + ?Sized>(&mut self, v: &mut V) {
-        use ExprNode::*;
-        match &mut *self.node {
+        use ExprNode::*; match &mut *self.node {
             BinOp(lhs, op, rhs) => v.visit_binop(lhs, op, rhs),
             UnOp(op, expr) => v.visit_op(op, expr),
             If(cond, bt, bf) => v.visit_if(cond, bt, bf),
@@ -172,7 +183,7 @@ use std::fmt;
 
 impl fmt::Display for BinOp {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
+        use BinOp::*; match self {
             Add => fmt.pad("+"),  Sub => fmt.pad("-"),
             Mul => fmt.pad("*"),  Div => fmt.pad("/"),
             Mod => fmt.pad("/"),
@@ -186,7 +197,7 @@ impl fmt::Display for BinOp {
 
 impl fmt::Display for UnOp {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
+        use UnOp::*; match self {
             Plus => fmt.pad("+"),  Minus => fmt.pad("-"),
         }
     }
@@ -194,8 +205,7 @@ impl fmt::Display for UnOp {
 
 impl fmt::Display for Const {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        use Const::*;
-        match self {
+        use Const::*; use self::Gate::*; match self {
             Num(i) => fmt.write_fmt(format_args!("{}", i)),
             Bool(true) => fmt.pad("'True"),
             Bool(false) => fmt.pad("'False"),
@@ -209,8 +219,7 @@ impl fmt::Display for Const {
 
 impl fmt::Display for Expr {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        use ExprNode::*;
-        match &*self.node {
+        use ExprNode::*; match &*self.node {
             BinOp(l, op, r) =>
                 fmt.write_fmt(format_args!("({} {} {})", op, l, r)),
             UnOp(op, e)     =>
