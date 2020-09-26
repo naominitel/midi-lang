@@ -1,10 +1,14 @@
-#[macro_use]
-extern crate lalrpop_util;
-lalrpop_mod!(pub parser);
 extern crate clap;
+extern crate env_logger;
+#[macro_use] extern crate lalrpop_util;
+#[macro_use] extern crate log;
+
+lalrpop_mod!(pub parser);
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+
+use log::debug;
 
 mod ast;
 mod ident;
@@ -15,6 +19,8 @@ mod util;
 fn main() {
     use ast::{Args, ExprNode, Visitor};
     use clap::Arg;
+
+    env_logger::init();
 
     let clap = clap::App::new("myapp")
         .version("0.1").author("Naomi Nitel <naominitel@gmail.com>")
@@ -35,12 +41,12 @@ fn main() {
 
     match ast {
         Ok(mut def) => {
-            println!("Parsed: `{}`", def);
+            debug!("Parsed: `{}`", def);
 
             let mut scope = scope::Scope::new(&mut int);
             scope.visit_def(&mut def);
 
-            println!("Scoped: `{}`", def);
+            debug!("Scoped: `{}`", def);
 
             let (args, ret, body) = match *def.value.node {
                 ExprNode::Lambda(args, ret, body) => (args, ret, body),

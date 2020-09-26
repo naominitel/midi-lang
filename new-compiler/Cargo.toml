@@ -11,6 +11,8 @@ version = "*"
 features = [ "lexer" ]
 
 [dependencies]
-lalrpop-util = "*"
-regex = "*"
 clap = "*"
+env_logger = "*"
+lalrpop-util = "*"
+log = "*"
+regex = "*"
