@@ -35,12 +35,12 @@ fn main() {
 
     match ast {
         Ok(mut def) => {
-            println!("Parsed: `{:?}`", def);
+            println!("Parsed: `{}`", def);
 
             let mut scope = scope::Scope::new(&mut int);
             scope.visit_def(&mut def);
 
-            println!("Scoped: `{:?}`", def);
+            println!("Scoped: `{}`", def);
 
             let (args, ret, body) = match *def.value.node {
                 ExprNode::Lambda(args, ret, body) => (args, ret, body),

@@ -165,3 +165,98 @@ impl Expr {
         }
     }
 }
+
+// display implementations (PP)
+
+use std::fmt;
+
+impl fmt::Display for BinOp {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Add => fmt.pad("+"),  Sub => fmt.pad("-"),
+            Mul => fmt.pad("*"),  Div => fmt.pad("/"),
+            Mod => fmt.pad("/"),
+            Eq  => fmt.pad("=="), Neq => fmt.pad("!="),
+            Lt  => fmt.pad("<"),  Gt  => fmt.pad(">"),
+            Le  => fmt.pad("<="), Ge  => fmt.pad(">="),
+            And => fmt.pad("&&"), Or  => fmt.pad("||"),
+        }
+    }
+}
+
+impl fmt::Display for UnOp {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match self {
+            Plus => fmt.pad("+"),  Minus => fmt.pad("-"),
+        }
+    }
+}
+
+impl fmt::Display for Const {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        use Const::*;
+        match self {
+            Num(i) => fmt.write_fmt(format_args!("{}", i)),
+            Bool(true) => fmt.pad("'True"),
+            Bool(false) => fmt.pad("'False"),
+            Str(s) => fmt.write_fmt(format_args!("\"{}\"", s)),
+            Gate(On) => fmt.pad("'On"),
+            Gate(Off) => fmt.pad("'Off"),
+            Gate(Tie) => fmt.pad("'Tie"),
+        }
+    }
+}
+
+impl fmt::Display for Expr {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        use ExprNode::*;
+        match &*self.node {
+            BinOp(l, op, r) =>
+                fmt.write_fmt(format_args!("({} {} {})", op, l, r)),
+            UnOp(op, e)     =>
+                fmt.write_fmt(format_args!("({} {})", op, e)),
+            If(c, t, f)     =>
+                fmt.write_fmt(format_args!("(if {} {} {})", c, t, f)),
+            Call(f, args)   => {
+                fmt.write_fmt(format_args!("({}", f))?;
+                for arg in args {
+                    fmt.write_fmt(format_args!(" {}", arg))?;
+                }
+                fmt.write_fmt(format_args!(")"))
+            }
+            Var(var)        =>
+                fmt.write_fmt(format_args!("{:?}", var)),
+            Cst(cst)        =>
+                fmt.write_fmt(format_args!("{}", cst)),
+            Index(e, idx)   =>
+                fmt.write_fmt(format_args!("{}[{}]", e, idx)),
+            Field(e, fld)   =>
+                fmt.write_fmt(format_args!("{}.{}", e, fld)),
+            Poly(n)         => {
+                fmt.write_fmt(format_args!("{{"))?;
+                for (p, g, v) in n {
+                    fmt.write_fmt(format_args!("({} {} {})", p, g, v))?;
+                }
+                fmt.write_fmt(format_args!("}}"))
+            }
+            Mono(p, g, v)   =>
+                fmt.write_fmt(format_args!("#({} {} {})", p, g, v)),
+            Lambda(a, t, e) => {
+                fmt.write_fmt(format_args!("(lambda"))?;
+                for (a, t) in a {
+                    fmt.write_fmt(format_args!(" ({:?} {:?})", a, t))?;
+                }
+                fmt.write_fmt(format_args!(" : {:?} . ", t))?;
+                fmt.write_fmt(format_args!("{})", e))
+            }
+            Let(var, v, e)  =>
+                fmt.write_fmt(format_args!("(let ({:?} {}) {})", var, v, e)),
+        }
+    }
+}
+
+impl fmt::Display for Def {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        fmt.write_fmt(format_args!("(def {} {})", self.name, self.value))
+    }
+}
