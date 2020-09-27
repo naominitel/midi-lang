@@ -1,6 +1,4 @@
-use std::collections::HashMap;
 use crate::ast;
-use crate::ident::Ident;
 use crate::util::BinWrite;
 use crate::util::BinWriteExt;
 
@@ -52,7 +50,6 @@ struct TransCtx<'a> {
     relocs: Vec<(usize, &'a str)>,
     next_node: u16,
     next_var: u16,
-    env: HashMap<Ident, (u16, u16)>,
     depth: u16
 }
 
@@ -200,11 +197,10 @@ impl<'a> TransCtx<'a> {
             // vars, consts (AST leafs)
             Var(v) => {
                 let this = self.next();
-                let v = *self.env.get(&*v).unwrap();
                 self.buf.write_le(OpCode::Get);
                 self.buf.write_le::<u8>(0);
-                self.buf.write_le::<u16>(v.0);
-                self.buf.write_le::<u16>(v.1);
+                self.buf.write_le::<u16>(v.data().index.get());
+                self.buf.write_le::<u16>(v.data().depth.get());
                 self.buf.align(8);
                 this
             }
@@ -224,15 +220,12 @@ impl<'a> TransCtx<'a> {
                 self.buf.write_le::<u16>(nvar);
                 self.buf.write_le::<u16>(self.depth);
                 self.buf.write_le::<u16>(e1);
-                let old = self.env.insert(v.clone(), (nvar, self.depth));
+                v.data().index.set(nvar);
+                v.data().depth.set(self.depth);
                 let e_let = self.expr(e2);
+                // no need to restore anything since IDs are scoped
                 // TODO: we could also restore var nums to reuse
                 // memory spaces from different branches of AST
-                // FIXME: not efficient way of restoring context
-                match old {
-                    Some(e) => self.env.insert(v.clone(), e),
-                    None => self.env.remove(&*v),
-                };
                 let this = self.next();
                 self.buf.write_le::<u8>(OpCode::Nop as u8);
                 self.buf.write_le::<u8>(1);
@@ -259,11 +252,11 @@ impl<'a> TransCtx<'a> {
             Lambda(args, _, e) => {
                 // push context frame
                 self.depth += 1;
-                let old_env = self.env.clone();
                 let old_var = self.next_var;
                 self.next_var = 0;
                 for (v, _) in args {
-                    self.env.insert(v.clone(), (self.next_var, self.depth));
+                    v.data().index.set(self.next_var);
+                    v.data().depth.set(self.depth);
                     self.next_var += 1;
                 }
                 let e = self.expr(e);
@@ -273,7 +266,6 @@ impl<'a> TransCtx<'a> {
                 self.buf.write_le::<u16>(self.next_var - args.len() as u16);
                 self.buf.write_le::<u16>(e);
                 self.buf.align(8);
-                self.env = old_env;
                 self.next_var = old_var;
                 self.depth -= 1;
                 this
@@ -283,7 +275,7 @@ impl<'a> TransCtx<'a> {
 
     fn new(buf: Vec<u8>) -> TransCtx<'a> {
         TransCtx { buf: buf, relocs: Vec::new(), next_var: 0,
-                   env: HashMap::new(), next_node: 0, depth: 1 }
+                   next_node: 0, depth: 1 }
         // depth 0 is toplevel
     }
 }
@@ -329,7 +321,8 @@ pub fn update(def: ast::FnDef) -> Vec<u8> {
 
     match def.inputs {
         ast::Args::Named(ref args) => for (i, (v, _)) in args.iter().enumerate() {
-            ctx.env.insert(v.clone(), (i as u16, 1));
+            v.data().index.set(i as u16);
+            v.data().depth.set(1);
             ctx.next_var += 1;
         }
         _ => panic!("function args should be named")

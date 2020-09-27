@@ -17,6 +17,8 @@ pub struct Ident {
 // (some kinda compile-time KV store with traits)
 pub struct IdentData {
     pub scope: Cell<Option<Ident>>,
+    pub index: Cell<u16>,
+    pub depth: Cell<u16>
 }
 
 impl PartialEq for Ident {
@@ -85,7 +87,9 @@ impl Interner {
             id: self.next_id,
 
             data: Rc::new(IdentData{
-                scope: Cell::new(None)
+                scope: Cell::new(None),
+                index: Cell::new(0),
+                depth: Cell::new(0),
             })
         };
         self.next_id += 1; u
