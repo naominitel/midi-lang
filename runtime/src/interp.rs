@@ -8,7 +8,7 @@ pub struct Function {
     entry: u16,
     nargs: u8,
     nlocals: u16,
-    env: Arc<Mutex<EvalCtx>>,
+    env: EvalCtx,
 }
 
 impl ::std::fmt::Debug for Function {
@@ -27,36 +27,26 @@ impl Eq for Function {
 }
 
 #[derive(Debug)]
-pub struct EvalCtx {
+struct CtxFrame {
     env: Vec<Value>,
-    next: Option<Arc<Mutex<EvalCtx>>>
+}
+
+#[derive(Clone, Debug)]
+pub struct EvalCtx {
+    ctx: Vec<Arc<Mutex<CtxFrame>>>,
 }
 
 impl EvalCtx {
-    pub fn new() -> Arc<Mutex<EvalCtx>> {
-        Arc::new(Mutex::new(EvalCtx { env: vec![], next: None }))
+    pub fn new() -> EvalCtx {
+        EvalCtx { ctx: vec![Arc::new(Mutex::new(CtxFrame { env: vec![] }))] }
     }
 
-    fn get(&self, var: usize) -> Value {
-        if var < self.env.len() {
-            return self.env[var].clone();
-        }
-        if let Some(next) = &self.next {
-            return next.lock().unwrap().get(var - self.env.len());
-        }
-        panic!("bad env index");
+    fn get(&self, var: usize, depth: u16) -> Value {
+        self.ctx[depth as usize].lock().unwrap().env[var].clone()
     }
 
-    fn set(&mut self, var: usize, val: Value) {
-        if var < self.env.len() {
-            self.env[var] = val;
-            return;
-        }
-        if let Some(next) = &self.next {
-            next.lock().unwrap().set(var - self.env.len(), val);
-        } else {
-            panic!("bad env index");
-        }
+    fn set(&mut self, var: usize, depth: u16, val: Value) {
+        self.ctx[depth as usize].lock().unwrap().env[var] = val;
     }
 }
 
@@ -113,7 +103,7 @@ macro_rules! typed_unop (
 );
 
 impl Function {
-    fn eval(&self, op: u16, ctx: &Arc<Mutex<EvalCtx>>) -> Value {
+    fn eval(&self, op: u16, ctx: &mut EvalCtx) -> Value {
         use bytecode::Op::*;
         match self.code[op as usize] {
             Nop(ref ops) => {
@@ -125,9 +115,10 @@ impl Function {
             }
             Glob(ref glob) => panic!("unimplemented: globals"),
             Const(ref v) => v.clone(),
-            Get(v) => ctx.lock().unwrap().get(v as usize),
-            Set(v, e) => {
-                ctx.lock().unwrap().set(v as usize, self.eval(e, ctx));
+            Get(v, c) => ctx.get(v as usize, c),
+            Set(v, c, e) => {
+                let val = self.eval(e, ctx);
+                ctx.set(v as usize, c, val);
                 Value::Undef
             }
             Lambda(nargs, nlocals, op) => {
@@ -242,14 +233,13 @@ impl Function {
         for i in 0 .. self.nlocals {
             env.push(Value::Undef);
         }
-        let ctx = Arc::new(Mutex::new(EvalCtx {
-            env: env, next: Some(self.env.clone())
-        }));
+        let mut ctx = self.env.clone();
+        ctx.ctx.push(Arc::new(Mutex::new(CtxFrame { env })));
 
-        self.eval(self.entry, &ctx)
+        self.eval(self.entry, &mut ctx)
     }
 
-    pub fn new(toplevel_env: Arc<Mutex<EvalCtx>>, def: bytecode::NodeDef)
+    pub fn new(toplevel_env: EvalCtx, def: bytecode::NodeDef)
            -> Function {
         if def.outputs.len() != 1 {
             panic!("function nodes should have exactly 1 output")

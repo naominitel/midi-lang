@@ -1,0 +1,2 @@
+def foo = fn (x: mono): mono =>
+    (fn (y: mono): mono => x)(x)

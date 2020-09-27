@@ -107,7 +107,7 @@ impl Runtime {
             }
 
             // FIXME: dummy
-            let input = Value::Mono((64, bytecode::Gate::Off, 100));
+            let input = Value::Mono((64, bytecode::Gate::On, 100));
             let mono = chan.progression.at(chan.counter).code.invoke(vec![input]);
             //let mut outputs = chan.progression.at(chan.counter).code.get_outputs();
             // let mono = outputs.swap_remove(0);

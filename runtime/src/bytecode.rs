@@ -55,8 +55,8 @@ pub enum Op {
     Glob(Arc<String>),
     Const(Value),
     Pre(Var),
-    Get(u16),
-    Set(u16, Var),
+    Get(u16, u16),
+    Set(u16, u16, Var),
 
     Nop(Vec<Var>),
 
@@ -276,15 +276,16 @@ impl<'a> NodeDefParser<'a> {
                 Some(Get) => {
                     let _ = self.read_u8()?;
                     let var = self.read_u16()?;
-                    self.read_pad(4)?;
-                    Op::Get(var)
+                    let ctx = self.read_u16()?;
+                    self.read_pad(2)?;
+                    Op::Get(var, ctx)
                 }
                 Some(Set) => {
                     let _ = self.read_u8()?;
                     let var = self.read_u16()?;
+                    let ctx = self.read_u16()?;
                     let v = self.read_u16()?;
-                    self.read_pad(2)?;
-                    Op::Set(var, v)
+                    Op::Set(var, ctx, v)
                 }
                 Some(Lambda) => {
                     let nargs = self.read_u8()?;
@@ -485,8 +486,8 @@ impl NodeDef {
                 BinOp(And, v1, v2) => debug!("{} && {}", v1, v2),
                 UnOp(Minus, v) => debug!("- {}", v),
                 UnOp(Not, v) => debug!("! {}", v),
-                Get(c) => debug!("get({})", c),
-                Set(c, v) => debug!("set!({}, {})", c, v),
+                Get(i, c) => debug!("get({}.{})", i, c),
+                Set(i, c, v) => debug!("set!({}.{}, {})", i, c, v),
                 Nop(v) => debug!("{:?}", v),
                 If(c, t, f) => debug!("if {} then {} else {}", c, t, f),
                 Pre(v) => debug!("pre {}", v),

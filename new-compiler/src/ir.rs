@@ -52,7 +52,8 @@ struct TransCtx<'a> {
     relocs: Vec<(usize, &'a str)>,
     next_node: u16,
     next_var: u16,
-    env: HashMap<Ident, u16>
+    env: HashMap<Ident, (u16, u16)>,
+    depth: u16
 }
 
 impl BinWriteExt for Vec<u8> {
@@ -202,7 +203,8 @@ impl<'a> TransCtx<'a> {
                 let v = *self.env.get(&*v).unwrap();
                 self.buf.write_le(OpCode::Get);
                 self.buf.write_le::<u8>(0);
-                self.buf.write_le::<u16>(v);
+                self.buf.write_le::<u16>(v.0);
+                self.buf.write_le::<u16>(v.1);
                 self.buf.align(8);
                 this
             }
@@ -218,10 +220,11 @@ impl<'a> TransCtx<'a> {
                 self.next_var += 1;
                 let e_set = self.next();
                 self.buf.write_le::<u8>(OpCode::Set as u8);
-                self.buf.pad(3);
+                self.buf.write_le::<u8>(0);
                 self.buf.write_le::<u16>(nvar);
+                self.buf.write_le::<u16>(self.depth);
                 self.buf.write_le::<u16>(e1);
-                let old = self.env.insert(v.clone(), nvar);
+                let old = self.env.insert(v.clone(), (nvar, self.depth));
                 let e_let = self.expr(e2);
                 // TODO: we could also restore var nums to reuse
                 // memory spaces from different branches of AST
@@ -255,11 +258,12 @@ impl<'a> TransCtx<'a> {
             }
             Lambda(args, _, e) => {
                 // push context frame
+                self.depth += 1;
                 let old_env = self.env.clone();
                 let old_var = self.next_var;
                 self.next_var = 0;
                 for (v, _) in args {
-                    self.env.insert(v.clone(), self.next_var);
+                    self.env.insert(v.clone(), (self.next_var, self.depth));
                     self.next_var += 1;
                 }
                 let e = self.expr(e);
@@ -271,6 +275,7 @@ impl<'a> TransCtx<'a> {
                 self.buf.align(8);
                 self.env = old_env;
                 self.next_var = old_var;
+                self.depth -= 1;
                 this
             }
         }
@@ -278,7 +283,8 @@ impl<'a> TransCtx<'a> {
 
     fn new(buf: Vec<u8>) -> TransCtx<'a> {
         TransCtx { buf: buf, relocs: Vec::new(), next_var: 0,
-                   env: HashMap::new(), next_node: 0 }
+                   env: HashMap::new(), next_node: 0, depth: 1 }
+        // depth 0 is toplevel
     }
 }
 
@@ -323,7 +329,7 @@ pub fn update(def: ast::FnDef) -> Vec<u8> {
 
     match def.inputs {
         ast::Args::Named(ref args) => for (i, (v, _)) in args.iter().enumerate() {
-            ctx.env.insert(v.clone(), i as u16);
+            ctx.env.insert(v.clone(), (i as u16, 1));
             ctx.next_var += 1;
         }
         _ => panic!("function args should be named")
