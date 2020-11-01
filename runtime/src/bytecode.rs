@@ -298,7 +298,7 @@ impl<'a> NodeDefParser<'a> {
                     let n = self.read_u8()?;
                     let mut vars = Vec::with_capacity(n as usize);
                     let mut nbytes = 0;
-                    for i in 0..n+1 {
+                    for _ in 0..n+1 {
                         let var = self.read_u16()?;
                         vars.push(var);
                         nbytes += 2;

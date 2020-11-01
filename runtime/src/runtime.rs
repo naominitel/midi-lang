@@ -44,7 +44,7 @@ pub struct Runtime {
 type Scene = Vec<Canal>;
 
 struct Canal {
-    progression: Box<Progression + ::std::marker::Send>,
+    progression: Box<dyn Progression + ::std::marker::Send>,
     // scenes
     counter: usize,
     // ticks
@@ -79,7 +79,7 @@ impl Progression for Pattern {
     }
 }
 
-fn play(patterns: &Scene) {
+fn play(_patterns: &Scene) {
     // ??
 }
 
@@ -158,7 +158,7 @@ impl Runtime {
 
     // all channels jump to corresponding position
     fn jump_scene(&mut self, scene: &[usize]) {
-        for (i, &pos) in scene.iter().enumerate() {
+        for (i, &_pos) in scene.iter().enumerate() {
             self.scene[i].counter = i;
         }
     }
