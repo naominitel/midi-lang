@@ -1,10 +1,7 @@
 extern crate clap;
 extern crate env_logger;
-#[macro_use]
-extern crate lalrpop_util;
+extern crate lexpr;
 extern crate log;
-
-lalrpop_mod!(pub parser);
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -13,12 +10,12 @@ use log::debug;
 
 mod ast;
 mod ident;
-mod ir;
-mod scope;
+//mod ir;
+//mod scope;
 mod util;
 
 fn main() {
-    use ast::{Args, ExprNode, Visitor};
+    use ast::{Node, Visitor};
     use clap::Arg;
 
     env_logger::init();
@@ -31,43 +28,23 @@ fn main() {
     let opts = clap.get_matches();
     let input = opts.value_of("FILE").unwrap();
 
-    let mut s = String::new();
-    if let Err(err) = File::open(input).and_then(|mut f| f.read_to_string(&mut s)) {
-        println!("Input `{}`: I/O Error {}", input, err);
-        return;
-    }
+    let mut parser = match File::open(input) {
+        Ok(file) => lexpr::Parser::from_reader(file),
+        Err(err) => {
+            println!("Input `{}`: I/O Error {}", input, err);
+            return;
+        }
+    };
 
     let mut int = ident::Interner::new();
-    let ast = parser::DefParser::new().parse(&mut int, &s);
+    let ast = parser.expect_datum();
 
     match ast {
-        Ok(mut def) => {
-            debug!("Parsed: `{}`", def);
-
-            let mut scope = scope::Scope::new(&mut int);
-            scope.visit_def(&mut def);
-
-            debug!("Scoped: `{}`", def);
-
-            let (args, ret, body) = match *def.value.node {
-                ExprNode::Lambda(args, ret, body) => (args, ret, body),
-                _ => panic!("toplevel def should be a function")
-            };
-            let fndef = ast::FnDef {
-                name: def.name,
-                body: body,
-                inputs: Args::Named(args),
-                outputs: Args::Unnamed(vec![ret]),
-                locals: vec![],
-                attrs: vec![]
-            };
-            let ir = ir::update(fndef);
-            let mut out = OpenOptions::new()
-                .write(true)
-                .truncate(true)
-                .create(true)
-                .open("a.out").unwrap();
-            out.write(&ir).unwrap();
+        Ok(ast) => {
+            println!("parsed ast: {}", ast.value());
+            // convert to our ast
+            let ast = ast::from(&mut int, ast.as_ref());
+            debug!("parsed ast: {}", ast);
         }
         Err(err) => println!("Input `{}`: parse error {:?}", input, err),
     }

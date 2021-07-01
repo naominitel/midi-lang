@@ -1,7 +1,7 @@
 // scope analysis
 // replace source identifiers by unique ones which refer to lexical scopes
 
-use crate::ast::{Expr, Type, Visitor};
+use crate::ast::{Datum, Visitor};
 use crate::ident::{Ident, Interner};
 
 pub struct Scope<'a> {
@@ -57,6 +57,18 @@ impl<'a> Visitor for Scope<'a> {
         };
 
         *var = id;
+    }
+
+    fn visit_cons(&mut self, car: &mut Datum, cdr: &mut Datum) {
+        match car.node {
+            Node::Symbol(s) if s == "lambda" => {
+                let iter = cdr.iter();
+                let args = match iter.next() {
+                    Some(args) => args,
+                    None => panic!("ill-formed lambda")
+                }
+            }
+        }
     }
 
     fn visit_lambda(&mut self, args: &mut Vec<(Ident, Type)>,
