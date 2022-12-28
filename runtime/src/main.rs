@@ -109,12 +109,12 @@ fn main_run() -> Result<()> {
 
         let program = runtime::load_program();
         let runtime = Arc::new(Mutex::new(runtime::Runtime::new(program)));
-        let mut engine = engine::Engine::new();
+        let _engine = engine::Engine::new();
         let handler = handler::MidiHandler::new(runtime.clone());
         let toplevel = interp::EvalCtx::new();
 
         // handler moved into the callback closure and into the midi thread
-        let conn = inp.connect(dev_id, "runtime-port", move |_, data, _| {
+        let _conn = inp.connect(dev_id, "runtime-port", move |_, data, _| {
             handler.handle_message(data[0], &data[1..])
         }, ()).map_err(|e| RuntimeError::MidiConnectError(e))?;
 

@@ -25,7 +25,7 @@ impl Engine {
     pub fn new() -> Engine {
         let env = primitives::env();
         // let main_node = NodeDef::default();
-        let mut node_defs = DefMap::new();
+        let node_defs = DefMap::new();
         // let main_instance = NodeInstance::new(&main_node, &node_defs, &env);
         // start with an empty main node which does nothing
         // node_defs.insert("main".into(), main_node);

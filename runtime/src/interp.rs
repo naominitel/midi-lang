@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use bytecode::{self, Value};
-use primitives;
+//use primitives;
 
 #[derive(Clone)]
 pub struct Function {
@@ -113,7 +113,7 @@ impl Function {
                 }
                 ret
             }
-            Glob(ref glob) => panic!("unimplemented: globals"),
+            Glob(ref _glob) => panic!("unimplemented: globals"),
             Const(ref v) => v.clone(),
             Get(v, c) => ctx.get(v as usize, c),
             Set(v, c, e) => {
@@ -230,7 +230,7 @@ impl Function {
             panic!("bad arity: expected {} but found {}", self.nargs, args.len());
         }
         let mut env = args;
-        for i in 0 .. self.nlocals {
+        for _ in 0 .. self.nlocals {
             env.push(Value::Undef);
         }
         let mut ctx = self.env.clone();
